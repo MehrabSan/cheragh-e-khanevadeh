@@ -14,6 +14,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
@@ -67,6 +68,7 @@
       50% { box-shadow: 0 0 0 16px rgba(239,68,68,0); }
     }
     .photo-ring { border: 3px solid #e2e8f0; }
+    .dark .photo-ring { border-color: #475569; }
     .photo-ring-green { border: 3px solid #22c55e; }
     .fade-in { animation: fadeIn 0.3s ease; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -107,6 +109,45 @@ const loadContacts = () => {
 };
 const saveContacts = (data) => {
   try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {}
+};
+
+// ─── Dark Mode helpers ─────────────────────────────────────────────────────
+const DM_KEY = 'persian-contacts-dark';
+const loadDarkMode = () => {
+  try { return localStorage.getItem(DM_KEY) === 'true'; } catch { return false; }
+};
+
+// ─── Share helper ──────────────────────────────────────────────────────────
+const shareContact = async (name, phone) => {
+  const text = `${name}\n${phone}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: name, text }); } catch {}
+  } else {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('اطلاعات در کلیپ‌بورد کپی شد');
+    } catch {}
+  }
+};
+
+// ─── Search helper ─────────────────────────────────────────────────────────
+const matchesSearch = (contact, query) => {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  if (contact.name?.toLowerCase().includes(q)) return true;
+  if (contact.phone?.includes(query)) return true;
+  return false;
+};
+const familyMatchesSearch = (family, query) => {
+  if (!query) return true;
+  if (matchesSearch(family, query)) return true;
+  for (const child of (family.subContacts || [])) {
+    if (matchesSearch(child, query)) return true;
+    for (const gc of (child.subContacts || [])) {
+      if (matchesSearch(gc, query)) return true;
+    }
+  }
+  return false;
 };
 
 // ─── SVG Icons ────────────────────────────────────────────────────────────
@@ -177,6 +218,31 @@ const Icon = ({ name, size = 20, color = 'currentColor', className = '' }) => {
     sos: (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
         <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+      </svg>
+    ),
+    share: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    ),
+    search: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    ),
+    sun: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    ),
+    moon: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    ),
+    close: (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
       </svg>
     ),
   };
@@ -264,32 +330,34 @@ const ContactModal = ({ open, initial, onSave, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center modal-overlay" style={{background:'rgba(15,23,42,0.75)'}}>
-      <div className="w-full max-w-lg bg-white rounded-t-3xl p-6 fade-in" style={{paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'}}>
-        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-5"/>
-        <h2 className="text-xl font-bold text-slate-800 mb-5 text-center">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-t-3xl p-6 fade-in" style={{paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))'}}>
+        <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-600 rounded-full mx-auto mb-5"/>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-5 text-center">
           {initial ? 'ویرایش اطلاعات' : 'افزودن مخاطب'}
         </h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1.5">نام و نام خانوادگی</label>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">نام و نام خانوادگی</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="مثال: علی رضایی"
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-base focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 text-base focus:outline-none focus:border-blue-400 transition-colors"
               style={{userSelect:'text', WebkitUserSelect:'text'}}
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1.5">شماره تلفن</label>
+            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1.5">شماره تلفن</label>
             <input
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="مثال: ۰۹۱۲۱۲۳۴۵۶۷"
-              className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-base focus:outline-none focus:border-blue-400 transition-colors"
+              className="w-full border-2 border-slate-200 dark:border-slate-600 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 text-base focus:outline-none focus:border-blue-400 transition-colors"
               style={{userSelect:'text', WebkitUserSelect:'text', direction:'ltr', textAlign:'right'}}
             />
           </div>
@@ -297,7 +365,7 @@ const ContactModal = ({ open, initial, onSave, onClose }) => {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-semibold text-base active:bg-slate-200 transition-colors"
+            className="flex-1 py-3.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-base active:bg-slate-200 dark:active:bg-slate-600 transition-colors"
           >انصراف</button>
           <button
             onClick={handleSave}
@@ -315,13 +383,13 @@ const ConfirmDialog = ({ open, message, onConfirm, onCancel }) => {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay p-6" style={{background:'rgba(15,23,42,0.75)'}}>
-      <div className="w-full max-w-sm bg-white rounded-3xl p-6 fade-in">
+      <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-3xl p-6 fade-in">
         <div className="flex justify-center mb-4">
           <Icon name="alertCircle" size={44} color="#ef4444"/>
         </div>
-        <p className="text-slate-700 font-semibold text-center text-base mb-6">{message}</p>
+        <p className="text-slate-700 dark:text-slate-200 font-semibold text-center text-base mb-6">{message}</p>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-semibold active:bg-slate-200">نه</button>
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-semibold active:bg-slate-200 dark:active:bg-slate-600">نه</button>
           <button onClick={onConfirm} className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold active:bg-red-600">بله، حذف شود</button>
         </div>
       </div>
@@ -373,20 +441,39 @@ const PhotoUploader = ({ image, name, size = 80, onUpload }) => {
   );
 };
 
+// ─── Share Button ──────────────────────────────────────────────────────────
+const ShareButton = ({ name, phone, size = 'md' }) => {
+  if (!phone) return null;
+  const cls = size === 'sm'
+    ? 'w-9 h-9 bg-violet-50 dark:bg-violet-900/40 rounded-xl flex items-center justify-center active:bg-violet-100 dark:active:bg-violet-900/60'
+    : 'w-10 h-10 bg-violet-50 dark:bg-violet-900/40 rounded-xl flex items-center justify-center active:bg-violet-100 dark:active:bg-violet-900/60 shadow-sm';
+  const iconSize = size === 'sm' ? 14 : 18;
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); shareContact(name, phone); }}
+      className={cls}
+      aria-label="اشتراک‌گذاری"
+    >
+      <Icon name="share" size={iconSize} color="#7c3aed"/>
+    </button>
+  );
+};
+
 // ─── Level 3 Card ──────────────────────────────────────────────────────────
 const Level3Card = ({ contact, onUpdatePhoto, onEdit, onDelete }) => (
-  <div className="flex items-center gap-3 bg-white rounded-2xl p-3 card-shadow border border-slate-100 fade-in">
+  <div className="flex items-center gap-3 bg-white dark:bg-slate-700 rounded-2xl p-3 card-shadow border border-slate-100 dark:border-slate-600 fade-in">
     <PhotoUploader image={contact.image} name={contact.name} size={52} onUpload={b64 => onUpdatePhoto(b64)}/>
     <div className="flex-1 min-w-0">
-      <p className="font-semibold text-slate-800 text-sm truncate">{contact.name}</p>
+      <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm truncate">{contact.name}</p>
       {contact.phone && (
         <a href={`tel:${contact.phone}`} onClick={e => e.stopPropagation()}
-           className="text-blue-500 text-xs font-mono" style={{direction:'ltr', display:'inline-block'}}>
+           className="text-blue-500 dark:text-blue-400 text-xs font-mono" style={{direction:'ltr', display:'inline-block'}}>
           {toPersian(contact.phone)}
         </a>
       )}
     </div>
     <div className="flex gap-2 flex-shrink-0">
+      <ShareButton name={contact.name} phone={contact.phone} size="sm"/>
       {contact.phone && (
         <a href={`tel:${contact.phone}`} onClick={e => e.stopPropagation()}
            className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center active:bg-emerald-600 shadow-sm">
@@ -394,11 +481,11 @@ const Level3Card = ({ contact, onUpdatePhoto, onEdit, onDelete }) => (
         </a>
       )}
       <button onClick={e => { e.stopPropagation(); onEdit(); }}
-              className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center active:bg-blue-100">
+              className="w-9 h-9 bg-blue-50 dark:bg-blue-900/40 rounded-xl flex items-center justify-center active:bg-blue-100 dark:active:bg-blue-900/60">
         <Icon name="edit" size={16} color="#3b82f6"/>
       </button>
       <button onClick={e => { e.stopPropagation(); onDelete(); }}
-              className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center active:bg-red-100">
+              className="w-9 h-9 bg-red-50 dark:bg-red-900/40 rounded-xl flex items-center justify-center active:bg-red-100 dark:active:bg-red-900/60">
         <Icon name="trash" size={16} color="#ef4444"/>
       </button>
     </div>
@@ -406,10 +493,14 @@ const Level3Card = ({ contact, onUpdatePhoto, onEdit, onDelete }) => (
 );
 
 // ─── Level 2 Card ──────────────────────────────────────────────────────────
-const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUpdateChild, onDeleteChild }) => {
+const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUpdateChild, onDeleteChild, forceOpen }) => {
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
+
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   const handleAddL3 = (data) => {
     onAddChild({ id: uid(), name: data.name, phone: data.phone, image: null, subContacts: [] });
@@ -420,21 +511,22 @@ const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUp
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden fade-in card-shadow">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-750 overflow-hidden fade-in card-shadow" style={{backgroundColor: 'var(--l2bg)'}}>
       <div
-        className="flex items-center gap-3 p-3 cursor-pointer active:bg-slate-100 transition-colors"
+        className="flex items-center gap-3 p-3 cursor-pointer active:bg-slate-100 dark:active:bg-slate-600 transition-colors"
         onClick={() => setOpen(o => !o)}
       >
         <PhotoUploader image={contact.image} name={contact.name} size={58} onUpload={b64 => onUpdatePhoto(b64)}/>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 truncate">{contact.name}</p>
+          <p className="font-bold text-slate-800 dark:text-slate-100 truncate">{contact.name}</p>
           {contact.phone && (
-            <p className="text-slate-500 text-xs font-mono" style={{direction:'ltr', textAlign:'right'}}>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-mono" style={{direction:'ltr', textAlign:'right'}}>
               {toPersian(contact.phone)}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <ShareButton name={contact.name} phone={contact.phone}/>
           {contact.phone && (
             <a href={`tel:${contact.phone}`} onClick={e => e.stopPropagation()}
                className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center active:bg-emerald-600 shadow-sm">
@@ -451,15 +543,15 @@ const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUp
             {/* Toolbar */}
             <div className="flex gap-2 flex-wrap pt-1">
               <button onClick={e => { e.stopPropagation(); setModal({ type:'add-l3' }); }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-semibold active:bg-indigo-100">
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 rounded-xl text-xs font-semibold active:bg-indigo-100 dark:active:bg-indigo-900/60">
                 <Icon name="userPlus" size={14} color="#4f46e5"/> افزودن
               </button>
               <button onClick={e => { e.stopPropagation(); setModal({ type:'edit', initial: contact }); }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-semibold active:bg-blue-100">
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-xl text-xs font-semibold active:bg-blue-100 dark:active:bg-blue-900/60">
                 <Icon name="edit" size={14} color="#3b82f6"/> ویرایش
               </button>
               <button onClick={e => { e.stopPropagation(); setConfirm(true); }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-500 rounded-xl text-xs font-semibold active:bg-red-100">
+                className="flex items-center gap-1.5 px-3 py-2 bg-red-50 dark:bg-red-900/40 text-red-500 dark:text-red-300 rounded-xl text-xs font-semibold active:bg-red-100 dark:active:bg-red-900/60">
                 <Icon name="trash" size={14} color="#ef4444"/> حذف
               </button>
             </div>
@@ -479,7 +571,7 @@ const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUp
               </div>
             )}
             {(!contact.subContacts || contact.subContacts.length === 0) && (
-              <p className="text-slate-400 text-xs text-center py-2">همسر / نوه‌ای ثبت نشده</p>
+              <p className="text-slate-400 dark:text-slate-500 text-xs text-center py-2">همسر / نوه‌ای ثبت نشده</p>
             )}
           </div>
         )}
@@ -518,10 +610,14 @@ const Level2Card = ({ contact, onUpdatePhoto, onEdit, onDelete, onAddChild, onUp
 };
 
 // ─── Level 1 Card ──────────────────────────────────────────────────────────
-const Level1Card = ({ contact, onChange, onDelete }) => {
+const Level1Card = ({ contact, onChange, onDelete, forceOpen, searchQuery }) => {
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(false);
+
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
 
   const update = (patch) => onChange({ ...contact, ...patch });
 
@@ -565,11 +661,21 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
     updateChild(childId, updatedChild);
   };
 
+  // Determine which L2 children should be force-opened by search
+  const childForceOpen = (child) => {
+    if (!searchQuery) return false;
+    // If the search matches a grandchild, force-open this child
+    for (const gc of (child.subContacts || [])) {
+      if (matchesSearch(gc, searchQuery)) return true;
+    }
+    return false;
+  };
+
   return (
-    <div className="bg-white rounded-3xl card-shadow border border-slate-100 overflow-hidden fade-in">
+    <div className="bg-white dark:bg-slate-800 rounded-3xl card-shadow border border-slate-100 dark:border-slate-700 overflow-hidden fade-in">
       {/* Header */}
       <div
-        className="flex items-center gap-4 p-4 cursor-pointer active:bg-slate-50 transition-colors"
+        className="flex items-center gap-4 p-4 cursor-pointer active:bg-slate-50 dark:active:bg-slate-700 transition-colors"
         onClick={() => setOpen(o => !o)}
       >
         <PhotoUploader
@@ -579,26 +685,29 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
           onUpload={b64 => update({ image: b64 })}
         />
         <div className="flex-1 min-w-0">
-          <h2 className="font-extrabold text-slate-800 text-lg truncate leading-tight">{contact.name}</h2>
+          <h2 className="font-extrabold text-slate-800 dark:text-slate-100 text-lg truncate leading-tight">{contact.name}</h2>
           {contact.phone && (
-            <p className="text-slate-400 text-sm font-mono mt-0.5" style={{direction:'ltr', textAlign:'right'}}>
+            <p className="text-slate-400 dark:text-slate-500 text-sm font-mono mt-0.5" style={{direction:'ltr', textAlign:'right'}}>
               {toPersian(contact.phone)}
             </p>
           )}
-          <p className="text-slate-400 text-xs mt-1">
+          <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">
             {contact.subContacts?.length > 0
               ? `${toPersian(contact.subContacts.length)} فرزند`
               : 'فرزندی ثبت نشده'}
           </p>
         </div>
         <div className="flex flex-col items-center gap-2 flex-shrink-0">
-          {contact.phone && (
-            <a href={`tel:${contact.phone}`} onClick={e => e.stopPropagation()}
-               className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center active:bg-emerald-600 shadow-md"
-               aria-label={`تماس با ${contact.name}`}>
-              <Icon name="phone" size={24} color="white"/>
-            </a>
-          )}
+          <div className="flex items-center gap-2">
+            <ShareButton name={contact.name} phone={contact.phone}/>
+            {contact.phone && (
+              <a href={`tel:${contact.phone}`} onClick={e => e.stopPropagation()}
+                 className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center active:bg-emerald-600 shadow-md"
+                 aria-label={`تماس با ${contact.name}`}>
+                <Icon name="phone" size={24} color="white"/>
+              </a>
+            )}
+          </div>
           <div className="text-slate-300">
             {open ? <Icon name="chevronUp" size={22} color="#94a3b8"/> : <Icon name="chevronDown" size={22} color="#94a3b8"/>}
           </div>
@@ -608,7 +717,7 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
       {/* Expanded Body */}
       <div className={open ? 'accordion-open' : 'accordion-enter'}>
         {open && (
-          <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
+          <div className="px-4 pb-4 space-y-3 border-t border-slate-100 dark:border-slate-700 pt-3">
             {/* Toolbar */}
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => setModal({ type:'add-child' })}
@@ -616,11 +725,11 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
                 <Icon name="userPlus" size={16} color="white"/> افزودن فرزند
               </button>
               <button onClick={() => setModal({ type:'edit', initial: contact })}
-                className="flex items-center gap-1.5 px-3 py-2.5 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold active:bg-blue-100">
+                className="flex items-center gap-1.5 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 rounded-xl text-sm font-semibold active:bg-blue-100 dark:active:bg-blue-900/60">
                 <Icon name="edit" size={16} color="#3b82f6"/> ویرایش
               </button>
               <button onClick={() => setConfirm(true)}
-                className="flex items-center gap-1.5 px-3 py-2.5 bg-red-50 text-red-500 rounded-xl text-sm font-semibold active:bg-red-100">
+                className="flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-900/40 text-red-500 dark:text-red-300 rounded-xl text-sm font-semibold active:bg-red-100 dark:active:bg-red-900/60">
                 <Icon name="trash" size={16} color="#ef4444"/> حذف خانواده
               </button>
             </div>
@@ -632,6 +741,7 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
                   <Level2Card
                     key={child.id}
                     contact={child}
+                    forceOpen={childForceOpen(child)}
                     onUpdatePhoto={b64 => updateChild(child.id, { ...child, image: b64 })}
                     onEdit={data => updateChild(child.id, { ...child, ...data })}
                     onDelete={() => deleteChild(child.id)}
@@ -643,9 +753,9 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
               </div>
             ) : (
               <div className="py-4 text-center">
-                <p className="text-slate-400 text-sm">هنوز فرزندی اضافه نشده است</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm">هنوز فرزندی اضافه نشده است</p>
                 <button onClick={() => setModal({ type:'add-child' })}
-                  className="mt-2 text-indigo-500 text-sm font-semibold active:text-indigo-600">
+                  className="mt-2 text-indigo-500 dark:text-indigo-400 text-sm font-semibold active:text-indigo-600">
                   + افزودن اولین فرزند
                 </button>
               </div>
@@ -679,11 +789,11 @@ const Level1Card = ({ contact, onChange, onDelete }) => {
 // ─── Empty State ───────────────────────────────────────────────────────────
 const EmptyState = ({ onAdd }) => (
   <div className="flex flex-col items-center justify-center h-full text-center px-8 py-16 fade-in">
-    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center mb-6 shadow-inner">
+    <div className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 flex items-center justify-center mb-6 shadow-inner">
       <Icon name="userPlus" size={52} color="#6366f1"/>
     </div>
-    <h2 className="text-2xl font-extrabold text-slate-700 mb-2">خوش آمدید!</h2>
-    <p className="text-slate-400 text-base leading-relaxed mb-8">
+    <h2 className="text-2xl font-extrabold text-slate-700 dark:text-slate-200 mb-2">خوش آمدید!</h2>
+    <p className="text-slate-400 dark:text-slate-500 text-base leading-relaxed mb-8">
       هنوز هیچ خانواده‌ای ثبت نشده است.<br/>برای شروع، یک خانواده جدید اضافه کنید.
     </p>
     <button
@@ -700,10 +810,26 @@ const EmptyState = ({ onAdd }) => (
 const App = () => {
   const [contacts, setContacts] = useState(() => loadContacts());
   const [modal, setModal] = useState(null);
+  const [dark, setDark] = useState(() => loadDarkMode());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchVersion, setSearchVersion] = useState(0);
+  const searchInputRef = useRef();
+
+  // Apply dark mode class
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem(DM_KEY, dark ? 'true' : 'false');
+  }, [dark]);
 
   useEffect(() => {
     saveContacts(contacts);
   }, [contacts]);
+
+  // When search query changes, increment version to force-open matching cards
+  useEffect(() => {
+    if (searchQuery) setSearchVersion(v => v + 1);
+  }, [searchQuery]);
 
   const addFamily = (data) => {
     setContacts(prev => [...prev, { id: uid(), name: data.name, phone: data.phone, image: null, subContacts: [] }]);
@@ -717,40 +843,107 @@ const App = () => {
     setContacts(prev => prev.filter(c => c.id !== id));
   };
 
+  const filteredContacts = searchQuery
+    ? contacts.filter(c => familyMatchesSearch(c, searchQuery))
+    : contacts;
+
+  // Determine if a L1 card should be force-opened
+  const shouldForceOpen = (family) => {
+    if (!searchQuery) return false;
+    // If the match is in a child or grandchild, force-open L1
+    for (const child of (family.subContacts || [])) {
+      if (matchesSearch(child, searchQuery)) return true;
+      for (const gc of (child.subContacts || [])) {
+        if (matchesSearch(gc, searchQuery)) return true;
+      }
+    }
+    return false;
+  };
+
   return (
-    <div className="flex flex-col bg-slate-100" style={{height:'100vh', width:'100vw'}}>
+    <div className="flex flex-col bg-slate-100 dark:bg-slate-900" style={{height:'100vh', width:'100vw'}}>
       {/* Status Bar */}
       <StatusBar/>
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm" style={{zIndex:10}}>
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800 leading-tight">دفترچه تماس</h1>
-          <p className="text-slate-400 text-xs mt-0.5">
+      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between shadow-sm" style={{zIndex:10}}>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-extrabold text-slate-800 dark:text-slate-100 leading-tight">دفترچه تماس</h1>
+          <p className="text-slate-400 dark:text-slate-500 text-xs mt-0.5">
             {contacts.length > 0 ? `${toPersian(contacts.length)} خانواده ثبت‌شده` : 'مخاطبی ثبت نشده'}
           </p>
         </div>
-        <button
-          onClick={() => setModal('add-family')}
-          className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white rounded-2xl font-bold text-sm active:bg-indigo-600 shadow-md transition-all"
-        >
-          <Icon name="plus" size={18} color="white"/>
-          خانواده جدید
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => setDark(d => !d)}
+            className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-700 active:bg-slate-200 dark:active:bg-slate-600 transition-colors"
+            aria-label="تغییر تم"
+          >
+            {dark
+              ? <Icon name="sun" size={20} color="#fbbf24"/>
+              : <Icon name="moon" size={20} color="#64748b"/>
+            }
+          </button>
+          {/* Search toggle */}
+          <button
+            onClick={() => { setSearchOpen(o => !o); if (!searchOpen) setTimeout(() => searchInputRef.current?.focus(), 100); }}
+            className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-100 dark:bg-slate-700 active:bg-slate-200 dark:active:bg-slate-600 transition-colors"
+            aria-label="جستجو"
+          >
+            <Icon name="search" size={20} color="#64748b"/>
+          </button>
+          <button
+            onClick={() => setModal('add-family')}
+            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white rounded-2xl font-bold text-sm active:bg-indigo-600 shadow-md transition-all"
+          >
+            <Icon name="plus" size={18} color="white"/>
+            خانواده جدید
+          </button>
+        </div>
       </div>
+
+      {/* Search Bar */}
+      {searchOpen && (
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-2 flex items-center gap-3 fade-in">
+          <Icon name="search" size={18} color="#94a3b8"/>
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="جستجوی نام یا شماره..."
+            className="flex-1 bg-transparent text-slate-800 dark:text-slate-100 text-sm focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            style={{userSelect:'text', WebkitUserSelect:'text'}}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="p-1">
+              <Icon name="close" size={16} color="#94a3b8"/>
+            </button>
+          )}
+          <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="text-slate-400 dark:text-slate-500 text-xs font-semibold">بستن</button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 scroll-area" style={{minHeight:0}}>
         {contacts.length === 0 ? (
           <EmptyState onAdd={() => setModal('add-family')}/>
+        ) : filteredContacts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center fade-in">
+            <Icon name="search" size={48} color="#94a3b8"/>
+            <p className="text-slate-400 dark:text-slate-500 text-base mt-4">نتیجه‌ای یافت نشد</p>
+          </div>
         ) : (
           <div className="p-4 space-y-4 pb-32">
-            {contacts.map(contact => (
+            {filteredContacts.map(contact => (
               <Level1Card
-                key={contact.id}
+                key={contact.id + '-' + searchVersion}
                 contact={contact}
                 onChange={patch => updateFamily(contact.id, patch)}
                 onDelete={() => deleteFamily(contact.id)}
+                forceOpen={shouldForceOpen(contact)}
+                searchQuery={searchQuery}
               />
             ))}
           </div>
@@ -758,7 +951,7 @@ const App = () => {
       </div>
 
       {/* Footer SOS */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 flex items-center justify-center" style={{paddingBottom:'max(0.75rem, env(safe-area-inset-bottom))'}}>
+      <div className="bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-center" style={{paddingBottom:'max(0.75rem, env(safe-area-inset-bottom))'}}>
         <a
           href="tel:115"
           className="pulse-sos flex items-center gap-3 px-10 py-4 bg-red-500 text-white rounded-2xl font-extrabold text-xl shadow-xl active:bg-red-600 transition-all"
